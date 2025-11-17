@@ -199,6 +199,15 @@ for index, row in df.iterrows():
 
 print("\n所有文件夹创建完成!")
 
+# 清理旧格式的元数据(使用数字索引作为key的旧记录)
+old_format_keys = [k for k in metadata.keys() if k.isdigit()]
+if old_format_keys:
+    print(f"\n🔄 检测到 {len(old_format_keys)} 个旧格式的元数据记录,正在清理...")
+    for old_key in old_format_keys:
+        # 移除旧格式的记录
+        del metadata[old_key]
+    print(f"✅ 已清理旧格式记录")
+
 # 检查是否有被删除的行(元数据中存在但Excel中不存在的ID)
 orphaned_ids = set(metadata.keys()) - active_unique_ids
 if orphaned_ids:
@@ -207,9 +216,13 @@ if orphaned_ids:
         orphaned_meta = metadata[orphaned_id]
         orphaned_folder = Path(orphaned_meta['folder_path'])
         
+        # 兼容旧格式(payer)和新格式(original_payer)
+        payer_name = orphaned_meta.get('original_payer') or orphaned_meta.get('payer') or orphaned_meta.get('current_payer')
+        content_name = orphaned_meta.get('original_content') or orphaned_meta.get('current_content')
+        
         print(f"\n   ID: {orphaned_id}")
-        print(f"   付款人: {orphaned_meta.get('original_payer')}")
-        print(f"   开票内容: {orphaned_meta.get('original_content')}")
+        print(f"   付款人: {payer_name}")
+        print(f"   开票内容: {content_name}")
         print(f"   文件夹: {orphaned_folder}")
         
         if orphaned_folder.exists():
