@@ -3,6 +3,13 @@ import os
 import json
 from pathlib import Path
 import hashlib
+import sys
+
+# 设置标准输出编码为UTF-8,解决Windows命令行emoji显示问题
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 # 读取 Excel 文件
 excel_file = '社团报销.xlsx'
@@ -231,13 +238,46 @@ if orphaned_ids:
             if files:
                 print(f"   ⚠️  文件夹中还有 {len(files)} 个文件,已保留")
             else:
-                print(f"   ℹ️  文件夹为空,已保留(可手动删除)")
+                # 文件夹为空,删除它
+                try:
+                    orphaned_folder.rmdir()
+                    print(f"   ✅ 文件夹为空,已删除")
+                    
+                    # 检查父文件夹(付款人文件夹)是否也为空
+                    parent_folder = orphaned_folder.parent
+                    if parent_folder != base_dir and parent_folder.exists():
+                        # 检查父文件夹是否为空
+                        try:
+                            if not any(parent_folder.iterdir()):
+                                parent_folder.rmdir()
+                                print(f"   ✅ 父文件夹 {parent_folder.name} 也为空,已删除")
+                        except Exception as e:
+                            pass  # 父文件夹不为空或删除失败,忽略
+                except Exception as e:
+                    print(f"   ❌ 删除空文件夹失败: {e}")
         else:
             print(f"   ℹ️  文件夹不存在")
         
         # 标记为已删除(保留元数据以便恢复)
         metadata[orphaned_id]['deleted'] = True
         metadata[orphaned_id]['deleted_at'] = pd.Timestamp.now().isoformat()
+
+# 清理空的付款人文件夹
+empty_folders_deleted = []
+for item in base_dir.iterdir():
+    if item.is_dir() and item.name not in ['.git', '.azure']:
+        # 检查是否为空文件夹
+        try:
+            if not any(item.iterdir()):
+                item.rmdir()
+                empty_folders_deleted.append(item.name)
+        except Exception as e:
+            pass  # 忽略错误
+
+if empty_folders_deleted:
+    print(f"\n🧹 清理空的付款人文件夹:")
+    for folder_name in empty_folders_deleted:
+        print(f"   ✅ 已删除: {folder_name}")
 
 # 保存元数据
 save_metadata(metadata)
